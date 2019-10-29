@@ -1,0 +1,26 @@
+<canvas id="canvas"></canvas>
+<div id="uiContainer">
+  <div id="ui">
+    <div id="time"></div>
+    <div id="cameraX"></div>
+    <div id="cameraY"></div>
+    <div id="cameraZ"></div> 
+  </div>
+</div>
+
+<!--
+This sample uses TWGL (Tiny WebGL) to hide the clutter.
+Otherwise the sample would be full of code not related to the point of the sample.
+For more info see http://webgl2fundamentals.org/webgl/lessons/webgl-less-code-more-fun.html
+-->
+<script src="https://webgl2fundamentals.org/webgl/resources/twgl-full.min.js"></script>
+<script src="https://webgl2fundamentals.org/webgl/resources/m4.js"></script>
+<script src="https://webgl2fundamentals.org/webgl/resources/flattened-primitives.js"></script>
+<script src="https://webglfundamentals.org/webgl/resources/webgl-lessons-ui.js"></script>
+
+<!--
+TODO:
+- earthOrbitNode isn't what I thought it was. Disabling its rotation causes the moon to disappear. Figure this out, as it's probably related to the fact that nothing fucking works.
+- if I don't manage to make planets move: at least randomize their positions.
+- adjust planets' sizes and colors (considering reality).
+-->
