@@ -116,11 +116,10 @@ Node.prototype.updateWorldMatrix = function(matrix) {
 function main() {
   // Get A WebGL context
   /** @type {HTMLCanvasElement} */
-  var canvas = document.getElementById("canvas");
+  let canvas = document.getElementById("canvas");
   var gl = canvas.getContext("webgl2");
-  if (!gl) {
-    return;
-  }
+  if (!gl)
+    throw Error("Browser doesn't support webgl");
   
   makeSlider("#x", updateUI(setCameraX, drawScene), 200);
   makeSlider("#y", updateUI(setCameraY, drawScene), 300);
@@ -129,13 +128,15 @@ function main() {
   // Tell the twgl to match position with a_position, n
   // normal with a_normal etc..
   twgl.setAttributePrefix("a_");
-
-  var sphereBufferInfo = flattenedPrimitives.createSphereBufferInfo(gl, 10, 12, 6);
+  
+  var sphereBufferInfo =
+      flattenedPrimitives.createSphereBufferInfo(gl, 10, 12, 6);
 
   // setup GLSL program
   var programInfo = twgl.createProgramInfo(gl, [vs, fs]);
 
-  var sphereVAO = twgl.createVAOFromBufferInfo(gl, programInfo, sphereBufferInfo);
+  var sphereVAO =
+      twgl.createVAOFromBufferInfo(gl, programInfo, sphereBufferInfo);
 
   function degToRad(d) {
     return d * Math.PI / 180;
