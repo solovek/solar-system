@@ -148,6 +148,8 @@ function main() {
 
   // Let's make all the nodes
   var solarSystemNode = new Node();
+  solarSystemNode.localMatrix = m4.scaling(1,1,1);
+  
   var earthOrbitNode = new Node();
   // earth orbit 100 units from the sun
   earthOrbitNode.localMatrix = m4.translation(200, 0, 0);
