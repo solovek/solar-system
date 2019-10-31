@@ -1,9 +1,9 @@
 /*yes i'm ashamed of this*/
 
-// WebGL2 - Scene Graph - Solar System
-// from https://webgl2fundamentals.org/webgl/webgl-scene-graph-solar-system-adjusted.html
-
 "use strict";
+
+import Body from "./AstronomicalBody.js";
+import Node from "./Node.js";
 
 var vs = `#version 300 es
 
@@ -70,50 +70,8 @@ const updateUI = (fn, drawer) => (...args) => {
 const makeSlider = (id, fn, max) =>
   webglLessonsUI.setupSlider(id, { slide: fn, max: max });
 
-/****
- * name me
- */
-var Node = function() {
-  this.children = [];
-  this.localMatrix = m4.identity();
-  this.worldMatrix = m4.identity();
-};
-
-Node.prototype.setParent = function(parent) {
-  // remove us from our parent
-  if (this.parent) {
-    var ndx = this.parent.children.indexOf(this);
-    if (ndx >= 0) {
-      this.parent.children.splice(ndx, 1);
-    }
-  }
-
-  // Add us to our new parent
-  if (parent) {
-    parent.children.push(this);
-  }
-  this.parent = parent;
-};
-
-Node.prototype.updateWorldMatrix = function(matrix) {
-  if (matrix) {
-    // a matrix was passed in so do the math
-    m4.multiply(matrix, this.localMatrix, this.worldMatrix);
-  } else {
-    // no matrix was passed in so just copy.
-    m4.copy(this.localMatrix, this.worldMatrix);
-  }
-
-  // now process all the children
-  var worldMatrix = this.worldMatrix;
-  this.children.forEach(function(child) {
-    child.updateWorldMatrix(worldMatrix);
-  });
-};
-
-
-
-function main() {
+function main()
+{
   // Get A WebGL context
   /** @type {HTMLCanvasElement} */
   let canvas = document.getElementById("canvas");
@@ -144,204 +102,172 @@ function main() {
 
   var fieldOfViewRadians = degToRad(60);
 
+  var bodies = [];
   var objectsToDraw = [];
   var objects = [];
 
-  // Let's make all the nodes
-  var solarSystemNode = new Node();
-  solarSystemNode.localMatrix = m4.scaling(1,1,1);
-  
-  var earthOrbitNode = new Node();
-  // earth orbit 100 units from the sun
-  earthOrbitNode.localMatrix = m4.translation(200, 0, 0);
+  let sun = new Body({
+    orbitMatrix: m4.scaling(1, 1, 1),
+    bodyMatrix:  m4.scaling(5, 5, 5),
+    drawInfo: {
+      uniforms: {
+	u_colorOffset: [0.6, 0.6, 0, 1], // yellow
+	u_colorMult:   [0.4, 0.4, 0, 1],
+      },
+      programInfo: programInfo,
+      bufferInfo:  sphereBufferInfo,
+      vertexArray: sphereVAO
+    }
+  });
 
-  var moonOrbitNode = new Node();
-  // moon 20 units from the earth
-  moonOrbitNode.localMatrix = m4.translation(30, 0, 0);
+  let mercury = new Body({
+    parent:      sun,
+    orbitMatrix: m4.translation(100, 0, 0),
+    bodyMatrix:  m4.scaling    (1,   1, 1),
+    drawInfo: {
+      uniforms: {
+	u_colorOffset: [0.8, 0.2, 0.2, 1], // blue-green
+	u_colorMult:   [0.8, 0.5, 0.2, 1]
+      },
+      programInfo: programInfo,
+      bufferInfo:  sphereBufferInfo,
+      vertexArray: sphereVAO
+    }
+  });
 
-  var sunNode = new Node();
-  sunNode.localMatrix = m4.scaling(5, 5, 5);  // sun a the center
-  sunNode.drawInfo = {
-    uniforms: {
-      u_colorOffset: [0.6, 0.6, 0, 1], // yellow
-      u_colorMult:   [0.4, 0.4, 0, 1],
-    },
-    programInfo: programInfo,
-    bufferInfo: sphereBufferInfo,
-    vertexArray: sphereVAO,
-  };
-  
-  var mercuryNode = new Node();
-  mercuryNode.localMatrix =
-    m4.multiply(
-      m4.translation(100, 0, 0),
-      m4.scaling    (  1, 1, 1));
-  mercuryNode.drawInfo = {
-    uniforms: {
-      u_colorOffset: [0.8, 0.2, 0.2, 1], // blue-green
-      u_colorMult:   [0.8, 0.5, 0.2, 1]
-    },
-    programInfo: programInfo,
-    bufferInfo: sphereBufferInfo,
-    vertexArray: sphereVAO
-  };
-  
-  var venusNode = new Node();
-  venusNode.localMatrix = 
-    m4.multiply(
-      m4.translation(150, 0, 0),
-      m4.scaling    (  1, 1, 1));
-  venusNode.drawInfo = {
-    uniforms: {
-      u_colorOffset: [0.9, 0.1, 0.1, 1], // blue-green
-      u_colorMult:   [0.8, 0.5, 0.2, 1]
-    },
-    programInfo: programInfo,
-    bufferInfo: sphereBufferInfo,
-    vertexArray: sphereVAO
-  };
-  objects.push(venusNode);
+  let venus = new Body({
+    parent:      sun,
+    orbitMatrix: m4.translation(150, 0, 0),
+    bodyMatrix:  m4.scaling    (1,   1, 1),
+    drawInfo : {
+      uniforms: {
+	u_colorOffset: [0.9, 0.1, 0.1, 1], // blue-green
+	u_colorMult:   [0.8, 0.5, 0.2, 1]
+      },
+      programInfo: programInfo,
+      bufferInfo:  sphereBufferInfo,
+      vertexArray: sphereVAO
+    }
+  });
 
-  var earthNode = new Node();
-  // make the earth twice as large
-  earthNode.localMatrix = m4.scaling(2, 2, 2);   // make the earth twice as large
-  earthNode.drawInfo = {
-    uniforms: {
-      u_colorOffset: [0.2, 0.5, 0.8, 1],  // blue-green
-      u_colorMult:   [0.8, 0.5, 0.2, 1],
-    },
-    programInfo: programInfo,
-    bufferInfo: sphereBufferInfo,
-    vertexArray: sphereVAO,
-  };
+  let earth = new Body({
+    parent:      sun,
+    orbitMatrix: m4.translation(200, 0, 0),
+    bodyMatrix:  m4.scaling    (2,   2, 2),
+    drawInfo: {
+      uniforms: {
+	u_colorOffset: [0.2, 0.5, 0.8, 1],  // blue-green
+	u_colorMult:   [0.8, 0.5, 0.2, 1],
+      },
+      programInfo: programInfo,
+      bufferInfo:  sphereBufferInfo,
+      vertexArray: sphereVAO,
+    }
+  });
 
-  var moonNode = new Node();
-  moonNode.localMatrix = m4.scaling(0.4, 0.4, 0.4);
-  moonNode.drawInfo = {
-    uniforms: {
-      u_colorOffset: [0.6, 0.6, 0.6, 1],  // gray
-      u_colorMult:   [0.1, 0.1, 0.1, 1],
-    },
-    programInfo: programInfo,
-    bufferInfo: sphereBufferInfo,
-    vertexArray: sphereVAO,
-  };
-  
-  var marsNode = new Node();
-  marsNode.localMatrix = 
-    m4.multiply(
-      m4.translation(300, 0, 0),
-      m4.scaling    (  3, 3, 3));
-  marsNode.drawInfo = {
-    uniforms: {
-      u_colorOffset: [1, 0, 0, 1], // blue-green
-      u_colorMult:   [0.8, 0.5, 0.2, 1]
-    },
-    programInfo: programInfo,
-    bufferInfo: sphereBufferInfo,
-    vertexArray: sphereVAO
-  };
-  
-  var jupiterNode = new Node();
-  jupiterNode.localMatrix = 
-    m4.multiply(
-      m4.translation(400, 0, 0),
-      m4.scaling    (  5, 5, 5));
-  jupiterNode.drawInfo = {
-    uniforms: {
-      u_colorOffset: [0.3, 0.3, 0.3, 1], // blue-green
-      u_colorMult:   [0.8, 0.5, 0.2, 1]
-    },
-    programInfo: programInfo,
-    bufferInfo: sphereBufferInfo,
-    vertexArray: sphereVAO
-  };
-  
-  var saturnNode = new Node();
-  saturnNode.localMatrix = 
-    m4.multiply(
-      m4.translation(510, 0, 0),
-      m4.scaling    (  5, 5, 5));
-  saturnNode.drawInfo = {
-    uniforms: {
-      u_colorOffset: [0.2, 0.5, 0.8, 1], // blue-green
-      u_colorMult:   [0.8, 0.5, 0.2, 1]
-    },
-    programInfo: programInfo,
-    bufferInfo: sphereBufferInfo,
-    vertexArray: sphereVAO
-  };
-  
-  var uranusNode = new Node();
-  uranusNode.localMatrix = 
-    m4.multiply(
-      m4.translation(590, 0, 0),
-      m4.scaling    (  2, 2, 2));
-  uranusNode.drawInfo = {
-    uniforms: {
-      u_colorOffset: [0.2, 0.5, 0.8, 1], // blue-green
-      u_colorMult:   [0.8, 0.5, 0.2, 1]
-    },
-    programInfo: programInfo,
-    bufferInfo: sphereBufferInfo,
-    vertexArray: sphereVAO
-  };
-  
-  var neptuneNode = new Node();
-  neptuneNode.localMatrix = 
-    m4.multiply(
-      m4.translation(640, 0, 0),
-      m4.scaling    (  2, 2, 2));
-  neptuneNode.drawInfo = {
-    uniforms: {
-      u_colorOffset: [0, 0, 0.8, 1], // blue-green
-      u_colorMult:   [0.8, 0.5, 0.2, 1]
-    },
-    programInfo: programInfo,
-    bufferInfo: sphereBufferInfo,
-    vertexArray: sphereVAO
-  };
+  let moon = new Body({
+    parent:      earth,
+    orbitMatrix: m4.translation(30,  0,   0),
+    bodyMatrix:  m4.scaling    (0.4, 0.4, 0.4),
+    drawInfo: {
+      uniforms: {
+	u_colorOffset: [0.6, 0.6, 0.6, 1],  // gray
+	u_colorMult:   [0.1, 0.1, 0.1, 1],
+      },
+      programInfo: programInfo,
+      bufferInfo:  sphereBufferInfo,
+      vertexArray: sphereVAO,
+    }
+  });
 
-  // connect the celetial objects
-  sunNode.setParent(solarSystemNode);
-  mercuryNode.setParent(solarSystemNode);
-  venusNode.setParent(solarSystemNode);
-  earthOrbitNode.setParent(solarSystemNode);
-  earthNode.setParent(earthOrbitNode);
-  moonOrbitNode.setParent(earthOrbitNode);
-  moonNode.setParent(moonOrbitNode);
-  marsNode.setParent(solarSystemNode);
-  jupiterNode.setParent(solarSystemNode);
-  saturnNode.setParent(solarSystemNode);
-  uranusNode.setParent(solarSystemNode);
-  neptuneNode.setParent(solarSystemNode);
+  let mars = new Body({
+    parent:      sun,
+    orbitMatrix: m4.translation(300, 0, 0),
+    bodyMatrix:  m4.scaling    (3,   3, 3),
+    drawInfo: {
+      uniforms: {
+	u_colorOffset: [1, 0, 0, 1], // blue-green
+	u_colorMult:   [0.8, 0.5, 0.2, 1]
+      },
+      programInfo: programInfo,
+      bufferInfo:  sphereBufferInfo,
+      vertexArray: sphereVAO
+    }
+  });
+  
+  let jupiter = new Body({
+    parent:      sun,
+    orbitMatrix: m4.translation(400, 0, 0),
+    bodyMatrix:  m4.scaling    (5,   5, 5),
+    drawInfo: {
+      uniforms: {
+	u_colorOffset: [0.3, 0.3, 0.3, 1], // blue-green
+	u_colorMult:   [0.8, 0.5, 0.2, 1]
+      },
+      programInfo: programInfo,
+      bufferInfo:  sphereBufferInfo,
+      vertexArray: sphereVAO
+    }
+  });
+  
+  let saturn = new Body({
+    parent:      sun,
+    orbitMatrix: m4.translation(510, 0, 0),
+    bodyMatrix:  m4.scaling    (5,   5, 5),
+    drawInfo: {
+      uniforms: {
+	u_colorOffset: [0.2, 0.5, 0.8, 1], // blue-green
+	u_colorMult:   [0.8, 0.5, 0.2, 1]
+      },
+      programInfo: programInfo,
+      bufferInfo:  sphereBufferInfo,
+      vertexArray: sphereVAO
+    }
+  });
+  
+  let uranus = new Body({
+    parent:      sun,
+    orbitMatrix: m4.translation(590, 0, 0),
+    bodyMatrix:  m4.scaling    (2,   2, 2),
+    drawInfo: {
+      uniforms: {
+	u_colorOffset: [0.2, 0.5, 0.8, 1], // blue-green
+	u_colorMult:   [0.8, 0.5, 0.2, 1]
+      },
+      programInfo: programInfo,
+      bufferInfo: sphereBufferInfo,
+      vertexArray: sphereVAO
+    }
+  });
 
+  let neptune = new Body({
+    parent:      sun,
+    orbitMatrix: m4.translation(640, 0, 0),
+    bodyMatrix:  m4.scaling    (2,   2, 2),
+    drawInfo: {
+      uniforms: {
+	u_colorOffset: [0, 0, 0.8, 1], // blue-green
+	u_colorMult:   [0.8, 0.5, 0.2, 1]
+      },
+      programInfo: programInfo,
+      bufferInfo: sphereBufferInfo,
+      vertexArray: sphereVAO
+    }
+  });
+  
   var objects = [
-    sunNode,
-    mercuryNode,
-    venusNode,
-    earthNode,
-    moonNode,
-    marsNode,
-    jupiterNode,
-    saturnNode,
-    uranusNode,
-    neptuneNode
+    sun,
+    mercury,
+    venus,
+    earth,
+    moon,
+    mars,
+    jupiter,
+    saturn,
+    uranus,
+    neptune
   ];
-
-  var objectsToDraw = [
-    sunNode.drawInfo,
-    mercuryNode.drawInfo,
-    venusNode.drawInfo,
-    earthNode.drawInfo,
-    moonNode.drawInfo,
-    marsNode.drawInfo,
-    jupiterNode.drawInfo,
-    saturnNode.drawInfo,
-    uranusNode.drawInfo,
-    neptuneNode.drawInfo
-  ];
-
+  
   requestAnimationFrame(drawScene);
 
   // Draw the scene.
@@ -379,28 +305,33 @@ function main() {
     var viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
 
     // update the local matrices for each object.
-    m4.multiply(m4.yRotation(0.01), solarSystemNode.localMatrix, solarSystemNode.localMatrix);
-    m4.multiply(m4.yRotation(0.01), moonOrbitNode.localMatrix, moonOrbitNode.localMatrix);
+    m4.multiply(m4.yRotation(0.01), sun.orbit.localMatrix, sun.orbit.localMatrix);
+    //m4.multiply(m4.yRotation(0.01), moonOrbitNode.localMatrix, moonOrbitNode.localMatrix);
     // spin the sun
-    m4.multiply(m4.yRotation(0.005), sunNode.localMatrix, sunNode.localMatrix);
+    m4.multiply(m4.yRotation(0.005), sun.body.localMatrix, sun.body.localMatrix);
     // spin the earth
-    m4.multiply(m4.yRotation(0.05), earthNode.localMatrix, earthNode.localMatrix);
+    //m4.multiply(m4.yRotation(0.05), earthNode.localMatrix, earthNode.localMatrix);
     // spin the moon
-    m4.multiply(m4.yRotation(-0.01), moonNode.localMatrix, moonNode.localMatrix);
+    //m4.multiply(m4.yRotation(-0.01), moonNode.localMatrix, moonNode.localMatrix);
 
     // Update all world matrices in the scene graph
-    solarSystemNode.updateWorldMatrix();
+    sun.orbit.updateWorldMatrix();
 
     // Compute all the matrices for rendering
     objects.forEach(object => {
       object.drawInfo.uniforms.u_matrix = 
         m4.multiply(viewProjectionMatrix, 
-                    object.worldMatrix);
+                    object.body.worldMatrix);
     });
 
     // ------ Draw the objects --------
-
-    twgl.drawObjectList(gl, objectsToDraw);
+    let drawInfos = [];
+    
+    objects.forEach(object => {
+      drawInfos.push(object.drawInfo);
+    });
+    
+    twgl.drawObjectList(gl, drawInfos);
 
     requestAnimationFrame(drawScene);
   }
