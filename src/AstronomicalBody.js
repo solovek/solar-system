@@ -1,4 +1,4 @@
-import Node from "./Node.js";
+import Node from "./SceneNode.js";
 
 export default class AstronomicalBody {
   constructor (info)

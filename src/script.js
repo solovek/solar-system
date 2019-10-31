@@ -3,7 +3,7 @@
 "use strict";
 
 import Body from "./AstronomicalBody.js";
-import Node from "./Node.js";
+import Node from "./SceneNode.js";
 
 var vs = `#version 300 es
 
@@ -39,49 +39,56 @@ void main() {
 }
 `;
 
-/****
- * UI
- */
-var time = 0;
-const setTime = (event, ui) => {
-  time = ui.value;
+let canvas = document.getElementById("canvas");
+
+let cameraX = 0;
+let cameraY = 0;
+let cameraZ = 0;
+
+let panning = false;
+let prevx;
+let prevy;
+
+canvas.onmousedown = event => {
+  prevx = event.pageX;
+  prevy = event.pageY;
+  if (event.which == 1)
+    panning = true;
+  console.log("down");
 };
 
-var cameraX = 0;
-const setCameraX = (event, ui) => {
-  cameraX = ui.value;
+canvas.onmouseup = event => {
+  if (event.which == 1)
+    panning = false;
+  console.log("up");
 };
 
-var cameraY = 0;
-const setCameraY = (event, ui) => {
-  cameraY = ui.value;
+canvas.onmousemove = event => {
+  if (panning) {
+    let deltax = event.pageX - prevx;
+    let deltay = event.pageY - prevy;
+    
+    cameraX -= deltax;
+    cameraZ += deltay;
+    
+    prevx = event.pageX;
+    prevy = event.pageY;
+  }
 };
 
-var cameraZ = 0;
-const setCameraZ = (event, ui) => {
-  cameraZ = ui.value;
-};
-
-const updateUI = (fn, drawer) => (...args) => {
-  fn(...args);
-  drawer();
-};
-
-const makeSlider = (id, fn, max) =>
-  webglLessonsUI.setupSlider(id, { slide: fn, max: max });
+document.addEventListener('DOMMouseScroll',
+			  event => {
+			    cameraY += -event.detail * 10;
+			  },
+			  false);
 
 function main()
 {
   // Get A WebGL context
   /** @type {HTMLCanvasElement} */
-  let canvas = document.getElementById("canvas");
-  var gl = canvas.getContext("webgl2");
+  let gl = canvas.getContext("webgl2");
   if (!gl)
     throw Error("Browser doesn't support webgl");
-  
-  makeSlider("#x", updateUI(setCameraX, drawScene), 200);
-  makeSlider("#y", updateUI(setCameraY, drawScene), 300);
-  makeSlider("#z", updateUI(setCameraZ, drawScene), 300);
 
   // Tell the twgl to match position with a_position, n
   // normal with a_normal etc..
@@ -101,10 +108,6 @@ function main()
   }
 
   var fieldOfViewRadians = degToRad(60);
-
-  var bodies = [];
-  var objectsToDraw = [];
-  var objects = [];
 
   let sun = new Body({
     orbitMatrix: m4.scaling(1, 1, 1),
@@ -287,22 +290,20 @@ function main()
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     // Compute the projection matrix
-    var aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
-    var projectionMatrix =
+    let aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+    let projectionMatrix =
         m4.perspective(fieldOfViewRadians, aspect, 1, 2000);
 
     // Compute the camera's matrix using look at.
-    var cameraPosition = [cameraX,
-                          cameraY - 1000, 
-                          cameraZ];
-    var target = [0, 0, 0];
-    var up = [0, 0, 1];
-    var cameraMatrix = m4.lookAt(cameraPosition, target, up);
+    let cameraPosition = [cameraX, cameraY-1000, cameraZ];
+    let target = [cameraX, cameraY, cameraZ];
+    let up     = [0, 0, 1];
+    let cameraMatrix = m4.lookAt(cameraPosition, target, up);
 
     // Make a view matrix from the camera matrix.
-    var viewMatrix = m4.inverse(cameraMatrix);
+    let viewMatrix = m4.inverse(cameraMatrix);
 
-    var viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
+    let viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
 
     // update the local matrices for each object.
     m4.multiply(m4.yRotation(0.01), sun.orbit.localMatrix, sun.orbit.localMatrix);
@@ -325,13 +326,7 @@ function main()
     });
 
     // ------ Draw the objects --------
-    let drawInfos = [];
-    
-    objects.forEach(object => {
-      drawInfos.push(object.drawInfo);
-    });
-    
-    twgl.drawObjectList(gl, drawInfos);
+    twgl.drawObjectList(gl, objects.map(obj => obj.drawInfo));
 
     requestAnimationFrame(drawScene);
   }
