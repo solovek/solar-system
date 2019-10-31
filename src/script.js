@@ -5,39 +5,41 @@
 import Body from "./AstronomicalBody.js";
 import Node from "./SceneNode.js";
 
-var vs = `#version 300 es
+var vs = `
+#version 300 es
 
 in vec4 a_position;
-in vec4 a_color;
+in vec2 a_texcoord;
 
 uniform mat4 u_matrix;
 
-out vec4 v_color;
+// a varying to pass the texture coordinates to the fragment shader
+out vec2 v_texcoord;
 
-void main() {
+void main() 
+{
   // Multiply the position by the matrix.
   gl_Position = u_matrix * a_position;
 
-  // Pass the color to the fragment shader.
-  v_color = a_color;
-}
-`;
+  // Pass the texcoord to the fragment shader.
+  v_texcoord = a_texcoord;
+}`;
 
-var fs = `#version 300 es
+var fs = `
+#version 300 es
 precision mediump float;
 
 // Passed in from the vertex shader.
-in vec4 v_color;
+in vec2 v_texcoord;
 
-uniform vec4 u_colorMult;
-uniform vec4 u_colorOffset;
+uniform sampler2D u_texture;
 
 out vec4 outColor;
 
-void main() {
-   outColor = v_color * u_colorMult + u_colorOffset;
-}
-`;
+void main () 
+{
+  outColor = texture(u_texture, v_texcoord);
+}`;
 
 let canvas = document.getElementById("canvas");
 
@@ -82,6 +84,28 @@ document.addEventListener('DOMMouseScroll',
 			  },
 			  false);
 
+function loadTexture(gl, src)
+{
+  let texture = gl.createTexture();
+  
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.texImage2D (gl.TEXTURE_2D,    0, gl.RGBA, 1, 1, 0, gl.RGBA,
+		 gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
+  
+  let image = new Image();
+  image.addEventListener("load",
+			 function () {
+			   gl.bindTexture(gl.TEXTURE_2D, texture);
+			   gl.texImage2D (gl.TEXTURE_2D, 0,
+					  gl.RGBA, gl.RGBA,
+					  gl.UNSIGNED_BYTE,
+					  image)
+			   gl.generateMipmap(gl.TEXTURE_2D)});
+  image.src = "../data/textures/" + src;
+  
+  return texture;
+}
+
 function main()
 {
   // Get A WebGL context
@@ -94,28 +118,53 @@ function main()
   // normal with a_normal etc..
   twgl.setAttributePrefix("a_");
   
-  var sphereBufferInfo =
+  let sphereBufferInfo =
       flattenedPrimitives.createSphereBufferInfo(gl, 10, 12, 6);
 
   // setup GLSL program
-  var programInfo = twgl.createProgramInfo(gl, [vs, fs]);
-
-  var sphereVAO =
+  let programInfo = twgl.createProgramInfo(gl, [vs, fs]);
+  
+  let sphereVAO =
       twgl.createVAOFromBufferInfo(gl, programInfo, sphereBufferInfo);
+  
+  let texcoordAttrLoc = gl.getAttribLocation(programInfo.program,
+					     "a_texcoord");
 
+  let texcoordBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, texcoordBuffer);
+  gl.bufferData(
+    gl.ARRAY_BUFFER,
+    new Float32Array([
+      0, 0,
+      1, 1,
+      2, 2
+    ]),
+    gl.STATIC_DRAW);
+
+  gl.enableVertexAttribArray(texcoordAttrLoc);
+
+  let size = 2;
+  let type = gl.FLOAT;
+  let normalise = true;
+  let stride = 0;
+  let offset = 0;
+
+  gl.vertexAttribPointer(texcoordAttrLoc, size,
+			 type,            normalise,
+			 stride,          offset);
+  
   function degToRad(d) {
     return d * Math.PI / 180;
   }
 
-  var fieldOfViewRadians = degToRad(60);
+  let fieldOfViewRadians = degToRad(60);
 
   let sun = new Body({
     orbitMatrix: m4.scaling(1, 1, 1),
     bodyMatrix:  m4.scaling(5, 5, 5),
     drawInfo: {
       uniforms: {
-	u_colorOffset: [0.6, 0.6, 0, 1], // yellow
-	u_colorMult:   [0.4, 0.4, 0, 1],
+	u_texture: loadTexture(gl, "sun.jpg")
       },
       programInfo: programInfo,
       bufferInfo:  sphereBufferInfo,
@@ -129,8 +178,7 @@ function main()
     bodyMatrix:  m4.scaling    (1,   1, 1),
     drawInfo: {
       uniforms: {
-	u_colorOffset: [0.8, 0.2, 0.2, 1], // blue-green
-	u_colorMult:   [0.8, 0.5, 0.2, 1]
+	u_texture: loadTexture(gl, "mercury.jpg")
       },
       programInfo: programInfo,
       bufferInfo:  sphereBufferInfo,
@@ -144,8 +192,7 @@ function main()
     bodyMatrix:  m4.scaling    (1,   1, 1),
     drawInfo : {
       uniforms: {
-	u_colorOffset: [0.9, 0.1, 0.1, 1], // blue-green
-	u_colorMult:   [0.8, 0.5, 0.2, 1]
+	u_texture: loadTexture(gl, "venus.jpg")
       },
       programInfo: programInfo,
       bufferInfo:  sphereBufferInfo,
@@ -159,12 +206,11 @@ function main()
     bodyMatrix:  m4.scaling    (2,   2, 2),
     drawInfo: {
       uniforms: {
-	u_colorOffset: [0.2, 0.5, 0.8, 1],  // blue-green
-	u_colorMult:   [0.8, 0.5, 0.2, 1],
+	u_texture: loadTexture(gl, "earth.jpg")
       },
       programInfo: programInfo,
       bufferInfo:  sphereBufferInfo,
-      vertexArray: sphereVAO,
+      vertexArray: sphereVAO
     }
   });
 
@@ -174,8 +220,7 @@ function main()
     bodyMatrix:  m4.scaling    (0.4, 0.4, 0.4),
     drawInfo: {
       uniforms: {
-	u_colorOffset: [0.6, 0.6, 0.6, 1],  // gray
-	u_colorMult:   [0.1, 0.1, 0.1, 1],
+	u_texture: loadTexture(gl, "moon.jpg")
       },
       programInfo: programInfo,
       bufferInfo:  sphereBufferInfo,
@@ -189,8 +234,7 @@ function main()
     bodyMatrix:  m4.scaling    (3,   3, 3),
     drawInfo: {
       uniforms: {
-	u_colorOffset: [1, 0, 0, 1], // blue-green
-	u_colorMult:   [0.8, 0.5, 0.2, 1]
+	u_texture: loadTexture(gl, "mars.jpg")
       },
       programInfo: programInfo,
       bufferInfo:  sphereBufferInfo,
@@ -204,8 +248,7 @@ function main()
     bodyMatrix:  m4.scaling    (5,   5, 5),
     drawInfo: {
       uniforms: {
-	u_colorOffset: [0.3, 0.3, 0.3, 1], // blue-green
-	u_colorMult:   [0.8, 0.5, 0.2, 1]
+	u_texture: loadTexture(gl, "jupiter.jpg")
       },
       programInfo: programInfo,
       bufferInfo:  sphereBufferInfo,
@@ -219,8 +262,7 @@ function main()
     bodyMatrix:  m4.scaling    (5,   5, 5),
     drawInfo: {
       uniforms: {
-	u_colorOffset: [0.2, 0.5, 0.8, 1], // blue-green
-	u_colorMult:   [0.8, 0.5, 0.2, 1]
+	u_texture: loadTexture(gl, "saturn.jpg")
       },
       programInfo: programInfo,
       bufferInfo:  sphereBufferInfo,
@@ -234,11 +276,10 @@ function main()
     bodyMatrix:  m4.scaling    (2,   2, 2),
     drawInfo: {
       uniforms: {
-	u_colorOffset: [0.2, 0.5, 0.8, 1], // blue-green
-	u_colorMult:   [0.8, 0.5, 0.2, 1]
+	u_texture: loadTexture(gl, "uranus.jpg")
       },
       programInfo: programInfo,
-      bufferInfo: sphereBufferInfo,
+      bufferInfo:  sphereBufferInfo,
       vertexArray: sphereVAO
     }
   });
@@ -249,11 +290,10 @@ function main()
     bodyMatrix:  m4.scaling    (2,   2, 2),
     drawInfo: {
       uniforms: {
-	u_colorOffset: [0, 0, 0.8, 1], // blue-green
-	u_colorMult:   [0.8, 0.5, 0.2, 1]
+	u_texture: loadTexture(gl, "neptune.jpg")
       },
       programInfo: programInfo,
-      bufferInfo: sphereBufferInfo,
+      bufferInfo:  sphereBufferInfo,
       vertexArray: sphereVAO
     }
   });
@@ -307,7 +347,7 @@ function main()
 
     // update the local matrices for each object.
     m4.multiply(m4.yRotation(0.01), sun.orbit.localMatrix, sun.orbit.localMatrix);
-    //m4.multiply(m4.yRotation(0.01), moonOrbitNode.localMatrix, moonOrbitNode.localMatrix);
+    m4.multiply(m4.yRotation(0.01), moon.orbit.localMatrix, moon.orbit.localMatrix);
     // spin the sun
     m4.multiply(m4.yRotation(0.005), sun.body.localMatrix, sun.body.localMatrix);
     // spin the earth
